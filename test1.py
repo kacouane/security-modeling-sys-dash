@@ -74,7 +74,7 @@ def dropdown():
 app.layout = html.Div(children=[
     html.H1(children='test display'),
     generate_table(dataset),
-   html.Div( [html.Div(id='datatable-interactivity-container'), html.Div(dcc.Graph(id='datatable-interactivity-pie-container')),html.Hr(),dropdown()],style={'columnCount': 2,'padding': 10}),
+   html.Div( [html.Div(id='datatable-interactivity-container'), html.Hr(),html.Div(dcc.Graph(id='datatable-interactivity-pie-container')),dropdown()],style={'columnCount': 2,'padding': 10}),
     #dropdown()
     #TODO generate report
     #generate best solution
@@ -106,7 +106,7 @@ def update_graphs(row_ids, selected_row_ids, active_cell):
         dff = dataset.loc[selected_row_ids]
 
     active_row_id = active_cell['row_id'] if active_cell else None
-    active_row = dataset.loc[active_row_id]
+    active_row = dataset.loc[active_row_id] if active_cell else None
 
    
     accucoverage= pa.DataFrame({
