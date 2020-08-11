@@ -74,15 +74,14 @@ def dropdown():
 app.layout = html.Div(children=[
     html.H1(children='test display'),
     generate_table(dataset),
-   html.Div( [html.Div(id='datatable-interactivity-container'),html.Div(id='datatable-interactivity-pie-container'),dropdown()],style={'columnCount': 4,'padding': 10}),
+   html.Div( [html.Div(id='datatable-interactivity-container'), html.Div(dcc.Graph(id='datatable-interactivity-pie-container')),html.Hr(),dropdown()],style={'columnCount': 2,'padding': 10}),
     #dropdown()
     #TODO generate report
     #generate best solution
 ])
 
 @app.callback(
-    [Output('datatable-interactivity-container', 'children'),
-    Output('datatable-interactivity-pie-container', 'children')],
+    [Output('datatable-interactivity-container', 'children'),Output('datatable-interactivity-pie-container', 'figure')],
     [Input('datatable-interactivity', 'derived_virtual_row_ids'),
      Input('datatable-interactivity', 'selected_row_ids'),
      Input('datatable-interactivity', 'active_cell')])
@@ -107,25 +106,28 @@ def update_graphs(row_ids, selected_row_ids, active_cell):
         dff = dataset.loc[selected_row_ids]
 
     active_row_id = active_cell['row_id'] if active_cell else None
-
+    active_row = dataset.loc[active_row_id]
 
    
     accucoverage= pa.DataFrame({
         "Attacks":dataset.columns[2:22],
-        "Selection accumulated Coverage":list(dff[column].max()for column in dataset.columns[2:22])
+        "Selection accumulated Coverage": list(max(dff[column].max(),active_row[column]) for column in dataset.columns[2:22])  if active_cell else list(dff[column].max() for column in dataset.columns[2:22])
         })
-    accucoveragepie= pa.DataFrame({
-        "coverage":list(['vulnerability remaining','covered attacks']),
-        "nb_of_elements":list([accucoverage.loc[accucoverage['Selection accumulated Coverage']==0].count(),accucoverage.loc[accucoverage['Selection accumulated Coverage']==1].count()])
+    df= pa.DataFrame({
+        'coverage':['vulnerability remaining','covered attacks'],
+        'nb':[accucoverage['Attacks'].count()-sum(dff[column].max()for column in dataset.columns[2:22]),sum(dff[column].max()for column in dataset.columns[2:22])]
+        #'nb':[(accucoverage.loc[accucoverage["Selection accumulated Coverage"]==0].count()),(accucoverage.loc[accucoverage["Selection accumulated Coverage"]==1].count())]
         })
     #labels =['covered attacks','vulnerability remaining']
     #values = list(accucoverage['Selection accumulated Coverage'].value_counts(bins=[0,1]))
     
-    return [html.Div([ 
+    return html.Div([ 
         html.Label('Selection summary:'),
         dash_table.DataTable(columns=[{"name": i, "id": i} for i in accucoverage.columns],data=accucoverage.to_dict('records')),
-        'Output: {}'.format(accucoveragepie),
-        ],style={'padding': 10}),html.Div(px.pie(accucoveragepie,values='nb_of_elements',names='coverage'))]
+        #'Output: {}'.format(accucoverage['Attacks'].count()),
+        #dash_table.DataTable(data=accucoveragepie.to_dict('records')),
+        #px.pie(data=accucoveragepie)
+        ]),px.pie(df, values='nb', names='coverage')
 
     
 
