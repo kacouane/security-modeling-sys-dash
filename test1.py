@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import dash
 from dash.dependencies import Input, Output
 import dash_table
@@ -5,7 +6,8 @@ import dash_core_components as dcc
 import dash_html_components as html
 import plotly.express as px
 import pandas as pa
-
+from dash_table.Format import Format, Sign
+import dash_bootstrap_components as dbc
 #dataset
 
 dataset = pa.read_csv('/home/antoine/Documents/GDrive/CFI_survey/test excel/Survey_Compare_Tab-database.csv')
@@ -14,7 +16,7 @@ dataset['id'] = dataset['Technology']
 dataset.set_index('id', inplace=True, drop=False)
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
 
 
 #generate table 
@@ -45,14 +47,15 @@ def generate_table(dataframe, max_rows=30):
             'whiteSpace': 'normal',
             'height': 'auto',
         },
+        style_table={'overflowX': 'auto'},
     )
 def dropdown():
     return html.Div([
-    html.Label('Multi-Select Dropdown'),
     dcc.Dropdown(
         id='dropdown-selector',
         options= [{'label':i,'value':i} for i in dataset['Technology']],
-        multi=True
+        multi=True,
+        value=['NX bit']
     ),
     
 
@@ -71,14 +74,28 @@ def dropdown():
 
 
 #here is the display
-app.layout = html.Div(children=[
-    html.H1(children='test display'),
-    generate_table(dataset),
-   html.Div( [html.Div(id='datatable-interactivity-container'), html.Hr(),html.Div(dcc.Graph(id='datatable-interactivity-pie-container')),dropdown()],style={'columnCount': 2,'padding': 10}),
-    #dropdown()
-    #TODO generate report
-    #generate best solution
-])
+app.layout = dbc.Container(
+    [
+        html.H1(children='test display',style={'textAlign': 'center'}),
+        html.Hr(),
+        dbc.Row([
+            dbc.Col(html.Div(generate_table(dataset),style={'padding':25}),md=9),
+            dbc.Col([
+                dbc.Row(html.Div(id='datatable-interactivity-container',style={'padding':25})),
+                dbc.Row(dcc.Graph(id='datatable-interactivity-pie-container'))
+            ],md=2)
+        ]),
+        dbc.Row( [
+            
+            # dbc.Col(dcc.Graph(id='datatable-interactivity-pie-container')),
+            dbc.Col(dropdown())
+        ]),
+        #dropdown()
+        #TODO generate report
+        #generate best solution
+    ],
+    fluid=True,
+)
 
 @app.callback(
     [Output('datatable-interactivity-container', 'children'),Output('datatable-interactivity-pie-container', 'figure')],
@@ -86,7 +103,7 @@ app.layout = html.Div(children=[
      Input('datatable-interactivity', 'selected_row_ids'),
      Input('datatable-interactivity', 'active_cell')])
 
-def update_graphs(row_ids, selected_row_ids, active_cell):
+def generate_summary(row_ids, selected_row_ids, active_cell):
     # When the table is first rendered, `derived_virtual_data` and
     # `derived_virtual_selected_rows` will be `None`. This is due to an
     # idiosyncracy in Dash (unsupplied properties are always None and Dash
@@ -116,22 +133,41 @@ def update_graphs(row_ids, selected_row_ids, active_cell):
     df= pa.DataFrame({
         'coverage':['vulnerability remaining','covered attacks'],
         'nb':[accucoverage['Attacks'].count()-sum(dff[column].max()for column in dataset.columns[2:22]),sum(dff[column].max()for column in dataset.columns[2:22])]
-        #'nb':[(accucoverage.loc[accucoverage["Selection accumulated Coverage"]==0].count()),(accucoverage.loc[accucoverage["Selection accumulated Coverage"]==1].count())]
         })
     #labels =['covered attacks','vulnerability remaining']
     #values = list(accucoverage['Selection accumulated Coverage'].value_counts(bins=[0,1]))
     
-    return html.Div([ 
-        html.Label('Selection summary:'),
-        dash_table.DataTable(columns=[{"name": i, "id": i} for i in accucoverage.columns],data=accucoverage.to_dict('records')),
-        #'Output: {}'.format(accucoverage['Attacks'].count()),
-        #dash_table.DataTable(data=accucoveragepie.to_dict('records')),
-        #px.pie(data=accucoveragepie)
-        ]),px.pie(df, values='nb', names='coverage')
+    return dbc.Card([ 
+        dbc.Label('Selection summary:'),
+        dash_table.DataTable(
+            columns=[{"name": i, "id": i} for i in accucoverage.columns],
+            data=accucoverage.to_dict('records'),
+            style_data_conditional=[
+                {
+                    'if':{
+                        'filter_query':'{Selection accumulated Coverage}=0',
+                        'column_id': 'Selection accumulated Coverage'
+                    },
+                    'color': 'tomato',
+                    'fontWeight': 'bold'
+                },
+                {
+                    'if':{
+                        'filter_query':'{Selection accumulated Coverage}=1',
+                        'column_id': 'Selection accumulated Coverage'
+                    },
+                    'color': 'green',
+                    'fontWeight': 'bold'
+                },
+            ],
+            style_cell={'textAlign': 'center'},
+        )
+        ],
+        body=True,
+        ),px.pie(df, values='nb', names='coverage',color='coverage',color_discrete_map={'vulnerability remaining':'tomato','covered attacks':'lightgreen'})
 
     
 
 
 if __name__ == '__main__':
     app.run_server(debug=True)
-#print(dataset)
