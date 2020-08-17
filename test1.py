@@ -6,8 +6,11 @@ import dash_core_components as dcc
 import dash_html_components as html
 import plotly.express as px
 import pandas as pa
+import numpy as np
 from dash_table.Format import Format, Sign
 import dash_bootstrap_components as dbc
+from dash_extensions.enrich import Dash, Output, Input, State, Trigger
+import plotly.graph_objects as go
 #dataset
 
 dataset = pa.read_csv('/home/antoine/Documents/GDrive/CFI_survey/test excel/Survey_Compare_Tab-database.csv')
@@ -16,15 +19,21 @@ dataset['id'] = dataset['Technology']
 dataset.set_index('id', inplace=True, drop=False)
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
-app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
+app = Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
 
 
 #generate table 
 
 #TODO make it cute and dropdown filter? or extern ?
-
-def generate_table(dataframe, max_rows=30):
-    return dash_table.DataTable(
+# @app.callback(
+#     [Output('datatable-container', 'children'),
+#     ],
+#     [Trigger("dropdown-selector", "value"),
+#     ],
+#     )
+def generate_table():
+    max_rows=50
+    return html.Div([dash_table.DataTable(
         id='datatable-interactivity',
         columns=[
             {"name": i, "id": i, "deletable": False, "selectable": False} for i in dataset.columns
@@ -39,7 +48,7 @@ def generate_table(dataframe, max_rows=30):
         row_selectable="multi",
         row_deletable=False,
         selected_columns=[],
-        selected_rows=[],
+        selected_rows= [],
         page_action="native",
         page_current= 0,
         page_size= max_rows,
@@ -47,49 +56,141 @@ def generate_table(dataframe, max_rows=30):
             'whiteSpace': 'normal',
             'height': 'auto',
         },
+        css=[
+            {"selector": ".dash-spreadsheet-container table", "rule": '--text-color: green !important'},
+        ],
+        # fixed_columns={'headers': True, 'data': 1},style_table={'minWidth': '100%'}
         style_table={'overflowX': 'auto'},
+    ),html.Div(id='datatable-container')
+    ],style={'padding':25})
+
+
+@app.callback(
+    Output('datatable-interactivity', 'style_data_conditional'),
+    [Input('datatable-interactivity', 'selected_rows'),
+    Input('uncovered-attack', 'data'),
+    Input('covered-attack', 'data')
+    ],group='style_maintab'
+)
+def update_styles(selected_rows,uncovered_attacks,covered_attacks):
+    # print(uncovered_attacks)
+    return (
+        [{
+        'if': { 'column_id': i },
+        'background_color': 'rgba(255, 0, 0, 0.2)'
+    } for i in uncovered_attacks] +
+        [{
+        'if': { 'column_id': i },
+        'background_color': 'rgba(0, 255, 0, 0.2)'
+    } for i in covered_attacks] +
+        [{
+        'if': { 'row_index': i },
+        'background_color': 'rgba(0, 0, 255, 0.2)'
+    } for i in selected_rows]    
     )
+
+
+
+
+
+
 def dropdown():
     return html.Div([
     dcc.Dropdown(
         id='dropdown-selector',
         options= [{'label':i,'value':i} for i in dataset['Technology']],
         multi=True,
-        value=['NX bit']
+        # value=['NX bit']
     ),
     
 
 
-    html.Label('Text Input'),
-    dcc.Input(value='MTL', type='text'),
+    # html.Label('Text Input'),
+    # dcc.Input(value='MTL', type='text'),
 
-    html.Label('Slider'),
-    dcc.Slider(
-        min=0,
-        max=9,
-        marks={i: 'Label {}'.format(i) if i == 1 else str(i) for i in range(1, 6)},
-        value=5,
-    )
+    # html.Label('Slider'),
+    # dcc.Slider(
+    #     min=0,
+    #     max=9,
+    #     marks={i: 'Label {}'.format(i) if i == 1 else str(i) for i in range(1, 6)},
+    #     value=5,
+    # )
 ],style={'padding': 10})
+
+
+@app.callback(Output("sync", "data"),
+    Input('dropdown-selector','value'),
+    group='row_selector'
+    )
+def callback_dropdown(values):
+    return values
+
+@app.callback(Output("sync", "data"),
+    Input('datatable-interactivity', 'selected_row_ids'),
+    group='row_selector'
+    )
+def callback_tab(values):
+    selection_subset = dataset.loc[values]
+    return list(selection_subset['Technology'])
+
+
+@app.callback(
+    [ Output('dropdown-selector', 'value'),
+    Output('datatable-interactivity', 'selected_rows'),
+    ],
+    [Input("sync", "data"),
+     State('datatable-interactivity', 'selected_row_ids'),
+     State('dropdown-selector','value'),
+    ])   
+def updateur(sync_value,selection_table,selection_dropdown):
+
+    if selection_table is None:
+        dropdown_sync_value = None
+        # print("dropdown:",dropdown_sync_value,sync_value)
+        table_synced_value_1 = [np.where(dataset.index == sync_value[i])[0][0] for i in range(len(sync_value))] if sync_value != dropdown_sync_value else dash.no_update
+    else:
+        selection_subset = dataset.loc[selection_table]
+        dropdown_sync_value = list(selection_subset['Technology'])
+        # print("dropdown:",dropdown_sync_value,sync_value)
+        table_synced_value_1 = [np.where(dataset.index == sync_value[i])[0][0] for i in range(len(sync_value))] if sync_value != dropdown_sync_value else dash.no_update
+    if selection_dropdown is None:
+        table_synced_value = None
+        # print("table:",selection_dropdown,sync_value)
+        dropdown_sync_value_1 = sync_value if sync_value != selection_dropdown else dash.no_update
+    else:
+        table_synced_value =[np.where(dataset.index == selection_dropdown[i])[0][0] for i in range(len(selection_dropdown))]
+        # print("table:",selection_dropdown,sync_value)
+        dropdown_sync_value_1 = sync_value if sync_value != selection_dropdown else dash.no_update
+    # print("output:",dropdown_sync_value_1,table_synced_value_1)
+    return [dropdown_sync_value_1,
+    table_synced_value_1
+    ]
+
 
 
 #here is the display
 app.layout = dbc.Container(
     [
-        html.H1(children='test display',style={'textAlign': 'center'}),
+        html.H1(children='Fancy Title',style={'textAlign': 'center'}),
         html.Hr(),
         dbc.Row([
-            dbc.Col(html.Div(generate_table(dataset),style={'padding':25}),md=9),
             dbc.Col([
-                dbc.Row(html.Div(id='datatable-interactivity-container',style={'padding':25})),
+                html.Div(generate_table()),
+                html.Div(dropdown())
+            ],md=9),
+            dbc.Col([
+                dbc.Row(html.Div(id='attack-coverage-summary-tab-container',style={'padding':25})),
                 dbc.Row(dcc.Graph(id='datatable-interactivity-pie-container'))
             ],md=2)
         ]),
         dbc.Row( [
             
             # dbc.Col(dcc.Graph(id='datatable-interactivity-pie-container')),
-            dbc.Col(dropdown())
+            # dbc.Col(dropdown())
         ]),
+        dcc.Store(id="sync"),
+        dcc.Store(id="uncovered-attack"),
+        dcc.Store(id="covered-attack"),
         #dropdown()
         #TODO generate report
         #generate best solution
@@ -98,12 +199,20 @@ app.layout = dbc.Container(
 )
 
 @app.callback(
-    [Output('datatable-interactivity-container', 'children'),Output('datatable-interactivity-pie-container', 'figure')],
-    [Input('datatable-interactivity', 'derived_virtual_row_ids'),
-     Input('datatable-interactivity', 'selected_row_ids'),
-     Input('datatable-interactivity', 'active_cell')])
+    [Output('attack-coverage-summary-tab-container', 'children'),
+    Output('datatable-interactivity-pie-container', 'figure'),
+    Output('uncovered-attack', 'data'),
+    Output('covered-attack', 'data')
+    ],
+    [#Input('datatable-interactivity', 'derived_virtual_row_ids'),
+     Input('datatable-interactivity', 'selected_rows'),
+     Input('datatable-interactivity', 'active_cell')],
+    #  [Trigger("dropdown-selector", "value"),
+    # ],
+     )
 
-def generate_summary(row_ids, selected_row_ids, active_cell):
+def generate_summary(#row_ids,
+ selected_rows, active_cell):
     # When the table is first rendered, `derived_virtual_data` and
     # `derived_virtual_selected_rows` will be `None`. This is due to an
     # idiosyncracy in Dash (unsupplied properties are always None and Dash
@@ -113,14 +222,13 @@ def generate_summary(row_ids, selected_row_ids, active_cell):
     # Instead of setting `None` in here, you could also set
     # `derived_virtual_data=dataset.to_rows('dict')` when you initialize
     # the component.
-    selected_id_set = set(selected_row_ids or [])
-
-    if selected_row_ids is None:
+    
+    if selected_rows is None:
         dff = dataset
-        # pandas Series works enough like a list for this to be OK
-        row_ids = dataset['id']
+        # print("something happened")
     else:
-        dff = dataset.loc[selected_row_ids]
+        # print(dataset.loc[dataset.index[selected_rows]])
+        dff = dataset.loc[dataset.index[selected_rows]]
 
     active_row_id = active_cell['row_id'] if active_cell else None
     active_row = dataset.loc[active_row_id] if active_cell else None
@@ -136,10 +244,11 @@ def generate_summary(row_ids, selected_row_ids, active_cell):
         })
     #labels =['covered attacks','vulnerability remaining']
     #values = list(accucoverage['Selection accumulated Coverage'].value_counts(bins=[0,1]))
-    
-    return dbc.Card([ 
+    # print(list(accucoverage.loc[accucoverage['Selection accumulated Coverage']== 0]['Attacks']))
+    return [dbc.Card([ 
         dbc.Label('Selection summary:'),
         dash_table.DataTable(
+            id='summary-coverage-tab',
             columns=[{"name": i, "id": i} for i in accucoverage.columns],
             data=accucoverage.to_dict('records'),
             style_data_conditional=[
@@ -164,7 +273,11 @@ def generate_summary(row_ids, selected_row_ids, active_cell):
         )
         ],
         body=True,
-        ),px.pie(df, values='nb', names='coverage',color='coverage',color_discrete_map={'vulnerability remaining':'tomato','covered attacks':'lightgreen'})
+        ),
+        px.pie(df, values='nb', names='coverage',color='coverage',color_discrete_map={'vulnerability remaining':'tomato','covered attacks':'lightgreen'}),
+        list(accucoverage.loc[accucoverage['Selection accumulated Coverage']== 0]['Attacks']),
+        list(accucoverage.loc[accucoverage['Selection accumulated Coverage']== 1]['Attacks'])
+        ]
 
     
 

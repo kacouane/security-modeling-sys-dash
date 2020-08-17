@@ -1,50 +1,51 @@
 import dash
 import dash_html_components as html
-from dash.dependencies import Output, Input, State
-from dash_extensions.callback import DashCallbackBlueprint
+# import dash_extensions # import group #CallbackGrouper
 import dash_core_components as dcc
-    
-# app = dash.Dash()
+from dash_extensions.enrich import Dash, Output, Input, State
+
+
+# app = Dash()
 # app.layout = html.Div([html.Button("Button 1", id="btn1"), html.Button("Button 2", id="btn2"), html.Div(id="div")])
-# dcb = DashCallbackBlueprint() 
+# # dcb = DashCallbackBlueprint() 
 
 
-# @dcb.callback(Output("div", "children"), [Input("btn1", "n_clicks")])
+# @app.callback(Output("div", "children"), [Input("btn1", "n_clicks")],group="g1")
 # def click_btn1(n_clicks):
 #     return "You clicked btn1"
 
 
-# @dcb.callback(Output("div", "children"), [Input("btn2", "n_clicks")]) 
+# @app.callback(Output("div", "children"), [Input("btn2", "n_clicks")],group="g1") 
 # def click_btn2(n_clicks):
 #     return "You clicked btn2"
 
 
-# dcb.register(app)  
+# # dcb.register(app)  
 
 # if __name__ == '__main__':
 #     app.run_server()
 
 # Create app.
 min_value, max_value = 100, 1000
-app = dash.Dash(external_stylesheets=['https://codepen.io/chriddyp/pen/bWLwgP.css'])
+app = Dash(external_stylesheets=['https://codepen.io/chriddyp/pen/bWLwgP.css'])
 app.layout = html.Div([
     dcc.Input(id="input", type="numeric", min=min_value, max=max_value),
     dcc.Slider(id="slider", min=min_value, max=max_value),
     dcc.Store(id="sync")
 ])
 
-# Create callbacks.
-dcb = DashCallbackBlueprint()
+# Create grouped callbacks.
+# dcb = CallbackGrouper()
 
-@dcb.callback(Output("sync", "data"), [Input("input", "value")])
+@app.callback(Output("sync", "data"), [Input("input", "value")],group="my_group")
 def sync_input_value(value):
     return value
 
-@dcb.callback(Output("sync", "data"), [Input("slider", "value")])
+@app.callback(Output("sync", "data"), [Input("slider", "value")],group="my_group")
 def sync_slider_value(value):
     return value
 
-@dcb.callback([Output("input", "value"), Output("slider", "value")], [Input("sync", "data")],
+@app.callback([Output("input", "value"), Output("slider", "value")], [Input("sync", "data")],
               [State("input", "value"), State("slider", "value")])
 def update_components(current_value, input_prev, slider_prev):
     # Update only inputs that are out of sync (this step "breaks" the circular dependency).
@@ -52,7 +53,7 @@ def update_components(current_value, input_prev, slider_prev):
     slider_value = current_value if current_value != slider_prev else dash.no_update
     return [input_value, slider_value]
 
-dcb.register(app)
+# dcb.register(app)
 
 if __name__ == '__main__':
     app.run_server(debug=False)
