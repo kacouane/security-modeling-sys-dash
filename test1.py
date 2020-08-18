@@ -18,7 +18,7 @@ dataset = pa.read_csv('/home/antoine/Documents/GDrive/CFI_survey/test excel/Surv
 dataset['id'] = dataset['Technology']
 dataset.set_index('id', inplace=True, drop=False)
 
-external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
+# external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
 
 
@@ -34,9 +34,10 @@ app = Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
 def generate_table():
     max_rows=50
     return html.Div([dash_table.DataTable(
+    # return dash_table.DataTable(
         id='datatable-interactivity',
         columns=[
-            {"name": i, "id": i, "deletable": False, "selectable": False} for i in dataset.columns
+            {"name": i, "id": i} for i in dataset.columns
             # omit the id column
             if i != 'id'
         ],
@@ -50,47 +51,74 @@ def generate_table():
         selected_columns=[],
         selected_rows= [],
         page_action="native",
-        page_current= 0,
-        page_size= max_rows,
-        style_cell={
-            'whiteSpace': 'normal',
-            'height': 'auto',
-        },
+        # page_current= 0,
+        # page_size= max_rows,
+        # striped=True,
+        # style_as_list_view=True,
+        # style_cell={
+        #     'whiteSpace': 'normal',
+        #     'height': 'auto',
+        # },
+
+        fixed_columns={'headers': True, 'data': 1},style_table={'minWidth': '100%'},
         css=[
-            {"selector": ".dash-spreadsheet-container table", "rule": '--text-color: green !important'},
+            # {"selector": ".dash-spreadsheet-container table", "rule": '--text-color: green !important'},
+            {"selector": "td.cell--selected, td.focused", "rule": 'background-color: white !important'},
+            {"selector": "td.cell--selected, td.unfocused", "rule": 'background-color: white !important'},
+            {"selector": ".row-1","rule": 'margin-left: 10px'},
+            {"selector": ".row","rule": 'flex-wrap: nowrap'},
         ],
-        # fixed_columns={'headers': True, 'data': 1},style_table={'minWidth': '100%'}
-        style_table={'overflowX': 'auto'},
-    ),html.Div(id='datatable-container')
-    ],style={'padding':25})
+
+        # style_table={'overflowX': 'auto',},
+    )
+    ,html.Div(id='datatable-container')
+    ]#,style={'padding':25}
+    )
 
 
 @app.callback(
     Output('datatable-interactivity', 'style_data_conditional'),
-    [Input('datatable-interactivity', 'selected_rows'),
+    [Input('sync', 'data'),
     Input('uncovered-attack', 'data'),
     Input('covered-attack', 'data')
-    ],group='style_maintab'
+    ],
+    [Trigger('datatable-interactivity', 'data'),
+    ],
+    group='style_maintab'
 )
 def update_styles(selected_rows,uncovered_attacks,covered_attacks):
-    # print(uncovered_attacks)
-    return (
-        [{
+    style =  [{
         'if': { 'column_id': i },
-        'background_color': 'rgba(255, 0, 0, 0.2)'
-    } for i in uncovered_attacks] +
-        [{
+        'background_color': 'rgb(255, 200, 200)'
+    } for i in uncovered_attacks]
+    style += [{
         'if': { 'column_id': i },
-        'background_color': 'rgba(0, 255, 0, 0.2)'
-    } for i in covered_attacks] +
-        [{
-        'if': { 'row_index': i },
-        'background_color': 'rgba(0, 0, 255, 0.2)'
-    } for i in selected_rows]    
-    )
+        'background_color': 'rgb(200, 255, 200)'
+    } for i in covered_attacks] 
+    if not (selected_rows is None):
+         style += [{ 
+            'if': {
+                    'filter_query': '{{Technology}} = {}'.format('\''+i+'\''),
+                },
+        'background_color': 'rgb(200, 200, 255)'
+        } for i in selected_rows
+        ]  
+    return style
 
 
-
+@app.callback(
+    Output('datatable-interactivity', 'data'),
+    [Input('datatable-interactivity', 'data_timestamp')],
+    [State('datatable-interactivity', 'data'),
+    ],
+    # [Trigger('datatable-interactivity', 'data'),
+    # ],
+)
+def update_computed_columns(data_timestamp,data_input):
+    for row in data_input:
+        row['total cost'] = int(row['Cost memory']) + int(row['cost in process'])+ int(row['Cost runtime'])
+        # print(row['Technology'],row['total cost'])
+    return data_input
 
 
 
@@ -100,6 +128,7 @@ def dropdown():
         id='dropdown-selector',
         options= [{'label':i,'value':i} for i in dataset['Technology']],
         multi=True,
+        placeholder="Select one or more protection technology ...",
         # value=['NX bit']
     ),
     
@@ -167,52 +196,26 @@ def updateur(sync_value,selection_table,selection_dropdown):
     ]
 
 
-
-#here is the display
-app.layout = dbc.Container(
-    [
-        html.H1(children='Fancy Title',style={'textAlign': 'center'}),
-        html.Hr(),
-        dbc.Row([
-            dbc.Col([
-                html.Div(generate_table()),
-                html.Div(dropdown())
-            ],md=9),
-            dbc.Col([
-                dbc.Row(html.Div(id='attack-coverage-summary-tab-container',style={'padding':25})),
-                dbc.Row(dcc.Graph(id='datatable-interactivity-pie-container'))
-            ],md=2)
-        ]),
-        dbc.Row( [
-            
-            # dbc.Col(dcc.Graph(id='datatable-interactivity-pie-container')),
-            # dbc.Col(dropdown())
-        ]),
-        dcc.Store(id="sync"),
-        dcc.Store(id="uncovered-attack"),
-        dcc.Store(id="covered-attack"),
-        #dropdown()
-        #TODO generate report
-        #generate best solution
-    ],
-    fluid=True,
-)
-
 @app.callback(
-    [Output('attack-coverage-summary-tab-container', 'children'),
+    [
+    Output('attack-coverage-summary-tab-container', 'children'),
     Output('datatable-interactivity-pie-container', 'figure'),
     Output('uncovered-attack', 'data'),
-    Output('covered-attack', 'data')
+    Output('covered-attack', 'data'),
     ],
-    [#Input('datatable-interactivity', 'derived_virtual_row_ids'),
-     Input('datatable-interactivity', 'selected_rows'),
-     Input('datatable-interactivity', 'active_cell')],
-    #  [Trigger("dropdown-selector", "value"),
+    [
+    Input('sync', 'data'),
+    Input('datatable-interactivity', 'data')
+    ],
+    # [Trigger("dropdown-selector", "value"),
     # ],
      )
 
 def generate_summary(#row_ids,
- selected_rows, active_cell):
+ selected_rows,
+ datatab 
+#  active_cell 
+):
     # When the table is first rendered, `derived_virtual_data` and
     # `derived_virtual_selected_rows` will be `None`. This is due to an
     # idiosyncracy in Dash (unsupplied properties are always None and Dash
@@ -227,28 +230,31 @@ def generate_summary(#row_ids,
         dff = dataset
         # print("something happened")
     else:
+        subdata = pa.DataFrame(datatab,columns=[ i for i in dataset.columns])
+        subdata['id'] = subdata['Technology']
+        subdata.set_index('id', inplace=True, drop=False)
         # print(dataset.loc[dataset.index[selected_rows]])
-        dff = dataset.loc[dataset.index[selected_rows]]
-
-    active_row_id = active_cell['row_id'] if active_cell else None
-    active_row = dataset.loc[active_row_id] if active_cell else None
+        # dff = dataset.loc[dataset.index[selected_rows]]
+        dff = subdata.loc[selected_rows]
+    # active_row_id = active_cell['row_id'] if active_cell else None
+    # active_row = dataset.loc[active_row_id] if active_cell else None
 
    
     accucoverage= pa.DataFrame({
         "Attacks":dataset.columns[2:22],
-        "Selection accumulated Coverage": list(max(dff[column].max(),active_row[column]) for column in dataset.columns[2:22])  if active_cell else list(dff[column].max() for column in dataset.columns[2:22])
+        "Selection accumulated Coverage": list(dff[column].astype('int64').max() for column in dataset.columns[2:22]) #list(max(dff[column].max(),active_row[column]) for column in dataset.columns[2:22])  if active_cell else 
         })
+    # print('\n\n',list(accucoverage.loc[accucoverage['Selection accumulated Coverage']== 0]['Attacks']),'\n',list(accucoverage.loc[accucoverage['Selection accumulated Coverage']== 1]['Attacks']))
     df= pa.DataFrame({
         'coverage':['vulnerability remaining','covered attacks'],
-        'nb':[accucoverage['Attacks'].count()-sum(dff[column].max()for column in dataset.columns[2:22]),sum(dff[column].max()for column in dataset.columns[2:22])]
+        'nb':[(accucoverage.loc[accucoverage['Selection accumulated Coverage']== 0]).count()[0],(accucoverage.loc[accucoverage['Selection accumulated Coverage']== 1]).count()[0]]#accucoverage['Attacks'].count()-sum(accucoverage['Selection accumulated Coverage']),sum(accucoverage['Selection accumulated Coverage'])]
         })
     #labels =['covered attacks','vulnerability remaining']
     #values = list(accucoverage['Selection accumulated Coverage'].value_counts(bins=[0,1]))
     # print(list(accucoverage.loc[accucoverage['Selection accumulated Coverage']== 0]['Attacks']))
-    return [dbc.Card([ 
-        dbc.Label('Selection summary:'),
+    return [
         dash_table.DataTable(
-            id='summary-coverage-tab',
+            # id='summary-coverage-tab',
             columns=[{"name": i, "id": i} for i in accucoverage.columns],
             data=accucoverage.to_dict('records'),
             style_data_conditional=[
@@ -270,17 +276,60 @@ def generate_summary(#row_ids,
                 },
             ],
             style_cell={'textAlign': 'center'},
-        )
-        ],
-        body=True,
-        ),
+            include_headers_on_copy_paste=True,
+        ),       
         px.pie(df, values='nb', names='coverage',color='coverage',color_discrete_map={'vulnerability remaining':'tomato','covered attacks':'lightgreen'}),
         list(accucoverage.loc[accucoverage['Selection accumulated Coverage']== 0]['Attacks']),
-        list(accucoverage.loc[accucoverage['Selection accumulated Coverage']== 1]['Attacks'])
+        list(accucoverage.loc[accucoverage['Selection accumulated Coverage']== 1]['Attacks']),
         ]
 
     
+#here is the display
+app.layout = dbc.Container(
+    [
+        html.H1(children='Fancy Title',style={'textAlign': 'center'}),
+        html.Hr(),
+        dbc.Row([
+            dbc.Col([
+                dbc.Card([ 
+                    dbc.CardHeader('Protection Technology survey datas:'),
+                    html.Div(generate_table()),
+                    
+                ],
+                # body=True,
+                ),
+                html.Div(dropdown()),
+            ],md=8
+            ),
+            dbc.Card([ 
+                dbc.CardHeader('Selection summary:'),
+                dbc.Col([
+                    # dbc.Card([ 
+                        html.Div(id='attack-coverage-summary-tab-container',style={'padding': 15}),
 
+                    dbc.Row(dcc.Graph(id='datatable-interactivity-pie-container'))
+                    #  ],
+                    #  body=True,
+                    #  ),
+                ],),
+            ],
+            
+            ),
+        ]),
+        dbc.Row( [
+            
+            # dbc.Col(dcc.Graph(id='datatable-interactivity-pie-container')),
+            # dbc.Col(dropdown())
+        ]),
+        dcc.Store(id="sync"),
+        dcc.Store(id="uncovered-attack"),
+        dcc.Store(id="covered-attack"),
+        #dropdown()
+        #TODO generate report
+        #generate best solution
+    ],
+    fluid=True,
+)
 
 if __name__ == '__main__':
     app.run_server(debug=True)
