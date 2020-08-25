@@ -114,7 +114,7 @@ for j in range(1000):
     print('\n')
     print('=================================================')
     print('saving dataset nb '+str(j)+' to file ... ',end='',flush=True)
-    csv_data = old.to_csv('fusy_test_for_brute.csv') 
+    old.to_csv('fusy_test_for_brute.csv') 
     f = open("brute_persist.txt", "w")
     f.write(str(lastchecked))
     f.close() 

@@ -27,11 +27,12 @@ import dash_daq as daq
 #
 # Loading database
 #
+DRIVE_PATH='/home/antoine/Documents/GDrive/'
 
-dataset = pa.read_csv('/home/antoine/Documents/GDrive/CFI_survey/test excel/Survey_Compare_Tab-database.csv')
-attack_properties = pa.read_csv('/home/antoine/Documents/GDrive/CFI_survey/test excel/Survey_Compare_Tab - export_attack_properties.csv')
-old = pa.read_csv('fusy_test.csv') 
-old = old.drop(columns=['Unnamed: 0'])
+dataset = pa.read_csv(DRIVE_PATH+'CFI_survey/test excel/Survey_Compare_Tab-database.csv')
+attack_properties = pa.read_csv(DRIVE_PATH+'CFI_survey/test excel/Survey_Compare_Tab - export_attack_properties.csv')
+fuzzy_bests = pa.read_csv('fuzzy_bests.csv') 
+fuzzy_bests = fuzzy_bests.drop(columns=['Unnamed: 0'])
 
 
 #
@@ -526,10 +527,10 @@ def propertify(selection,mega_tab):
     )
 def fuzzy_graph(selection,data_uptodate):
 
-    to_report = old.query('coverage_over_cost'+' in '+ str(list(old['coverage_over_cost'].nlargest(nb_of_data_to_display))))
+    # to_report =fuzzy_bests.query('coverage_over_cost'+' in '+ str(list(old['coverage_over_cost'].nlargest(nb_of_data_to_display))))
 
-    to_report.insert(5,'source','fuzzy generated')
-    to_report.insert(6,'size',1)
+    fuzzy_bests.insert(5,'source','fuzzy generated')
+    fuzzy_bests.insert(6,'size',1) #TODO size depend on coverage ponderated 
     if not((selection is None) or (selection == [])):
         selection = {
             'techs':str(selection),
@@ -542,9 +543,9 @@ def fuzzy_graph(selection,data_uptodate):
         if selection['cost'] == 0:
             selection['cost']=1
         selection['coverage_over_cost']=selection['coverage']/selection['cost']
-        to_report = to_report.append(selection,ignore_index = True)
+        fuzzy_bests = fuzzy_bests.append(selection,ignore_index = True)
     # print(to_report)
-    return generate_fuzzy_report(to_report)
+    return generate_fuzzy_report(fuzzy_bests)
 
 
 
