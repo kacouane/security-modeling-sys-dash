@@ -11,6 +11,8 @@
 
 import dash
 from dash.dependencies import Input, Output
+import scipy as sp
+from scipy import optimize
 import dash_table
 import dash_core_components as dcc
 import dash_html_components as html
@@ -21,12 +23,16 @@ from dash_table.Format import Format, Sign
 import dash_bootstrap_components as dbc
 from dash_extensions.enrich import Dash, Output, Input, State, Trigger
 import plotly.graph_objects as go
-
+import dash_daq as daq
 #
 # Loading database
 #
 
 dataset = pa.read_csv('/home/antoine/Documents/GDrive/CFI_survey/test excel/Survey_Compare_Tab-database.csv')
+attack_properties = pa.read_csv('/home/antoine/Documents/GDrive/CFI_survey/test excel/Survey_Compare_Tab - export_attack_properties.csv')
+old = pa.read_csv('fusy_test.csv') 
+old = old.drop(columns=['Unnamed: 0'])
+
 
 #
 #   use Technologie name as unique key to select a row
@@ -49,15 +55,38 @@ Header_Column = 'Protections'
 Hidden_Columns = ['id','reference paper',Master_key_Column,Header_Column]
 Cost_input_Columns = ['Cost memory','cost in process','Cost runtime']
 Total_Cost_Column = 'total cost'
-Attack_List = dataset.columns[2:22]
-
-
+Attack_List = list(attack_properties['Attack'])
+nb_of_data_to_display =2000
+Protection_list = list(dataset[Master_key_Column])
 #
 #   this dash app use BOOTSTRAP css files
 #
 
 
 app = Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
+
+
+
+
+
+def return_coverage(selection,database):
+    subdata = pa.DataFrame(database,columns=[ i for i in dataset.columns])
+    selection_database = subdata.query(Master_key_Column+' in '+str(selection))
+    list_of_coverage = list(selection_database[column].astype('int64').max() for column in Attack_List)
+    if len(list_of_coverage) != 0 :
+        ret = (sum(list_of_coverage)/len(list_of_coverage))*100
+    else :
+        ret = 1
+    return ret
+
+def return_cost(selection,database):
+    subdata = pa.DataFrame(database,columns=[ i for i in dataset.columns])
+    selection_database = subdata.query(Master_key_Column+' in '+str(selection))
+    a = selection_database[Total_Cost_Column].sum()
+    if a == 0:
+        a = 1
+    return(a)
+
 
 
 #
@@ -88,11 +117,13 @@ def generate_table():
         page_action="native",
         fixed_columns={'headers': True, 'data': 1},
         style_table={'minWidth': '100%'},
+        style_cell={'textAlign': 'center'},
         css=[
             {"selector": "td.cell--selected, td.focused", "rule": 'background-color: white !important'},
             {"selector": "td.cell--selected, td.unfocused", "rule": 'background-color: white !important'},
             {"selector": ".row-1","rule": 'margin-left: 10px'},
             {"selector": ".row","rule": 'flex-wrap: nowrap'},
+            {"selector": "td p","rule": 'margin: 0;text-align: center'},
         ],
 
     )
@@ -137,13 +168,127 @@ def alerter():
 # #     This tab should contain selected protection attributes 
 #
 
-def selection_attributes():
+def selection_coverage_attributes():
+    return html.Div([
+        dash_table.DataTable(
+            id="select-attribute-coverage",
+            style_cell={'textAlign': 'center'},
+            style_data_conditional=[
+                {
+                    'if':{
+                        'filter_query':'{Selection accumulated Coverage}=0',
+                        'column_id': 'Selection accumulated Coverage'
+                    },
+                    'color': 'tomato',
+                    'fontWeight': 'bold'
+                },
+                {
+                    'if':{
+                        'filter_query':'{Selection accumulated Coverage}=1',
+                        'column_id': 'Selection accumulated Coverage'
+                    },
+                    'color': 'green',
+                    'fontWeight': 'bold'
+                },
+            ],
+        )
+    ])
+
+
+#
+# #     This tab should contain selected protection attributes 
+#
+
+def selection_cost_attributes():
     return html.Div([
         dash_table.DataTable(
             id="select-attribute",
             style_cell={'textAlign': 'center'},
+                       
         )
     ])
+
+#
+# #     This display should contain selected protection attributes total
+#
+
+def selection_total_cost():
+    return html.Div([
+        daq.LEDDisplay(
+            label="Total Cost",
+            id="total-display",
+            # value=0,
+        )
+    ])
+
+
+def generate_fuzzy_report(dataset):
+
+    fig = px.scatter_3d(
+        dataset,
+        y="cost",
+        z="coverage",
+        color="coverage_over_cost",
+        x="nb_tech_used",
+        height=1200,
+        hover_data=["techs"],
+        # opacity=0.8,
+        symbol='source',
+        size='size',
+        size_max=24,
+        color_continuous_scale='Viridis')#,color_continuous_scale='Bluered_r',hover_name="coverageovercost"
+    fig.update_layout(
+        margin=dict(l=0, r=0, b=0, t=0),
+        scene_camera = dict(eye=dict(x=-1.5, y=-0.75, z=1.5)),
+        legend=dict(
+            yanchor="top",
+            y=0.99,
+            xanchor="left",
+            x=0.01
+            )
+    )
+    # data = [
+    #     dict(
+    #         x=ploted['nb_tech_used'],
+    #         y=ploted['cost'],
+    #         z=ploted['coverage'],
+    #         marker=dict(color=list(ploted['coverage_over_cost']),#dict( a tester
+    #             opacity=0.7,size_max=18,colorscale='Viridis'
+    #         ),
+    #         # height=1200
+    #         type="scatter3d",
+    #         # name="",
+    #         # hovertemplate=hovertemplate,
+    #         # showscale=False,
+    #         # colorscale=[[0, "#caf3ff"], [1, "#2c82ff"]],
+    #     )
+    # ]
+    # layout = dict(
+    #     margin=dict(l=0, r=0, b=0, t=0),
+    #     # modebar={"orientation": "v"},
+    #     font=dict(family="Open Sans"),
+    #     # scene_camera = dict(eye=dict(x=-1.25, y=-1.25, z=1.5)),
+    #     height=1200,
+    #     # annotations=annotations,
+    #     # # shapes=shapes,
+    #     xaxis=dict(
+    #         # 'nb_tech_used',
+    #         side="top",
+    #         ticks="",
+    #         ticklen=2,
+    #         tickfont=dict(family="sans-serif"),
+    #         tickcolor="#ffffff",
+    #     ),
+    #     yaxis=dict(
+    #         side="left", ticks="", tickfont=dict(family="sans-serif"), ticksuffix=" "
+    #     ),
+    #     coloraxis=dict(title=dict(text='coverage_over_cost'),
+    #         colorscale='Viridis'),
+    #     hovermode="closest",
+    #     # showlegend=False,
+    # )
+    # return {"data": data, "layout": layout}
+    return fig
 
 
 
@@ -273,20 +418,32 @@ def updateur(sync_value,selection_table,selection_dropdown):
 # #     folowing callback may be splitted into several but the reuse of values generated in summary tab make it easier this way
 #
 
+
 @app.callback(
-    [Output('attack-coverage-summary-tab-container', 'children'),
-    Output('datatable-interactivity-pie-container', 'figure'),
+    [Output('select-attribute-coverage', 'data'),
+    Output('select-attribute-coverage', 'columns'),
+    Output('datatable-interactivity-pie-coverage', 'figure'),
+    Output('datatable-interactivity-pie-coverage-ponderated', 'figure'),
     Output('uncovered-attack', 'data'),
     Output('covered-attack', 'data'),
     ],
     [Input('sync', 'data'),
-    Input('datatable-interactivity', 'data')
-    ])
+    Input('datatable-interactivity', 'data'),
+    Input('select-attribute-coverage', 'data_timestamp')
+    ],[State('select-attribute-coverage', 'data')]
+    )
 
 def generate_summary(
  selected_rows, # the tech selected by both checkboxes and dropdown system
- datatab # is dataset but updated by user
-                    ):
+ datatab, # is dataset but updated by user
+ updated_datas_timestamp,
+ updated_datas           ):
+    if not(updated_datas is None):
+        attack_easyness_updated = []
+        for row in updated_datas:
+            attack_easyness_updated.append(int(row['Attack easyness factor']))
+    else:
+        attack_easyness_updated = list(attack_properties['Attack implementation cost'])
     if selected_rows is None:
         dff = dataset
     else:
@@ -296,41 +453,32 @@ def generate_summary(
         dff = subdata.loc[selected_rows]
 
     accucoverage= pa.DataFrame({
-        "Attacks":Attack_List,
+        "Attacks":attack_properties['Attack'],
+        "Attack easyness factor":attack_easyness_updated,
         "Selection accumulated Coverage": list(dff[column].astype('int64').max() for column in Attack_List) 
         })
+    accucoverage['factor_hidden']=accucoverage['Selection accumulated Coverage']*(accucoverage['Attack easyness factor'])
+    # print(accucoverage)
+    columns_accucoverage = [
+        {"name": 'Attacks', "id": 'Attacks', "editable": False},
+        {"name": "Attack easyness factor", "id": "Attack easyness factor", "editable": True},
+        {"name": 'Selection accumulated Coverage', "id": 'Selection accumulated Coverage', "editable": False}
+    ]
+    
     df= pa.DataFrame({
         'coverage':['vulnerability remaining','covered attacks'],
         'nb':[(accucoverage.loc[accucoverage['Selection accumulated Coverage']== 0]).count()[0],(accucoverage.loc[accucoverage['Selection accumulated Coverage']== 1]).count()[0]]#accucoverage['Attacks'].count()-sum(accucoverage['Selection accumulated Coverage']),sum(accucoverage['Selection accumulated Coverage'])]
         })
+    # print('coverage ratio ponderated',accucoverage['factor_hidden'].sum())
+    # print('full coverage equi',accucoverage['Attack easyness factor'].sum())
+    df2= pa.DataFrame({
+        'coverage':['vulnerability remaining ponderated','covered attacks ponderated'],
+        'nb':[(accucoverage['Attack easyness factor'].sum())-(accucoverage['factor_hidden'].sum()),accucoverage['factor_hidden'].sum()]#accucoverage['Attacks'].count()-sum(accucoverage['Selection accumulated Coverage']),sum(accucoverage['Selection accumulated Coverage'])]
+        })
 
-    return [
-        dash_table.DataTable(
-            # id='summary-coverage-tab',
-            columns=[{"name": i, "id": i} for i in accucoverage.columns],
-            data=accucoverage.to_dict('records'),
-            style_data_conditional=[
-                {
-                    'if':{
-                        'filter_query':'{Selection accumulated Coverage}=0',
-                        'column_id': 'Selection accumulated Coverage'
-                    },
-                    'color': 'tomato',
-                    'fontWeight': 'bold'
-                },
-                {
-                    'if':{
-                        'filter_query':'{Selection accumulated Coverage}=1',
-                        'column_id': 'Selection accumulated Coverage'
-                    },
-                    'color': 'green',
-                    'fontWeight': 'bold'
-                },
-            ],
-            style_cell={'textAlign': 'center'},
-            include_headers_on_copy_paste=True,
-        ),       
+    return [accucoverage.to_dict('records'),columns_accucoverage,       
         px.pie(df, values='nb', names='coverage',color='coverage',color_discrete_map={'vulnerability remaining':'tomato','covered attacks':'lightgreen'}),
+        px.pie(df2, values='nb', names='coverage',color='coverage',color_discrete_map={'vulnerability remaining ponderated':'#CC0000','covered attacks ponderated':'#007E33'}),
         list(accucoverage.loc[accucoverage['Selection accumulated Coverage']== 0]['Attacks']),
         list(accucoverage.loc[accucoverage['Selection accumulated Coverage']== 1]['Attacks']),
         ]
@@ -341,29 +489,70 @@ def generate_summary(
 @app.callback(
     [Output('select-attribute', 'data'),
     Output('select-attribute', 'columns'),
-    # Output('uncovered-attack', 'data'),
-    # Output('covered-attack', 'data'),
+    Output('total-display', 'value'),
+    Output('fade-when-selection', 'is_in'),
     ],
     [Input('sync', 'data'),
     Input('datatable-interactivity', 'data')
     ])
 def propertify(selection,mega_tab):
-    if selection is None:
+    if (selection is None) or (selection == []):
         data = []
+        sum_cost = 0
+        columns = []
+        display = False
     else :
         subdata = pa.DataFrame(mega_tab,columns=[ i for i in dataset.columns])
         data = [{
             "Protection Selected": i,
             "Cost": subdata[subdata[Master_key_Column]== i][Total_Cost_Column]
         } for i in selection]
-    columns = [{"name": i, "id": i} for i in ['Protection Selected','Cost']]
-    return [data,columns]
+        columns = [{"name": i, "id": i} for i in ['Protection Selected','Cost']]
+        display = True
+        sum_cost = subdata.query(Master_key_Column+' in '+str(selection))[Total_Cost_Column].sum()
+    return [data,columns,sum_cost,display]
+
+
+#
+# #     folowing callback should display the best solutions generated during fuzzy 
+#
+
+@app.callback(
+    [Output('fuzzy-data-display', 'figure'),
+    ],
+    [Input('sync', 'data'),
+    Input('datatable-interactivity', 'data')
+    ]
+    )
+def fuzzy_graph(selection,data_uptodate):
+
+    to_report = old.query('coverage_over_cost'+' in '+ str(list(old['coverage_over_cost'].nlargest(nb_of_data_to_display))))
+
+    to_report.insert(5,'source','fuzzy generated')
+    to_report.insert(6,'size',1)
+    if not((selection is None) or (selection == [])):
+        selection = {
+            'techs':str(selection),
+            'coverage':return_coverage(selection,data_uptodate),
+            'cost':return_cost(selection,data_uptodate),
+            'source':'selection',
+            'nb_tech_used':len(selection),
+            'size':4
+        }
+        if selection['cost'] == 0:
+            selection['cost']=1
+        selection['coverage_over_cost']=selection['coverage']/selection['cost']
+        to_report = to_report.append(selection,ignore_index = True)
+    # print(to_report)
+    return generate_fuzzy_report(to_report)
+
+
+
+
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #                      Display is here                          #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #   
-
-
 
 app.layout = dbc.Container(
     [
@@ -382,35 +571,52 @@ app.layout = dbc.Container(
                 html.Div(dropdown(),style={'padding': 10}),
             ],md=8
             ),
+            dbc.Col([
             dbc.Card([ 
                 dbc.CardHeader('Selection summary:'),
                 dbc.Col([
                     # dbc.Card([ 
-                        html.Div(id='attack-coverage-summary-tab-container',style={'padding': 15}),
+                    html.Div(selection_coverage_attributes(),style={'padding': 15}),
 
-                    dbc.Row(dcc.Graph(id='datatable-interactivity-pie-container'))
+                    dbc.Row([
+                        dbc.Col(dcc.Graph(id='datatable-interactivity-pie-coverage'),md=6),
+                        dbc.Col(dcc.Graph(id='datatable-interactivity-pie-coverage-ponderated'),md=6),
+                    ])
                     #  ],
                     #  body=True,
                     #  ),
-                ],),
-            ],
-            
-            ),
+                ]),
+            ]),
+            ],md=4),
         ]),
+        
         dbc.Row( [
             dbc.Col([
+                dbc.Fade(
                 dbc.Card([
-                    dbc.CardHeader('Sytem generated have properties:'),
-                    dbc.CardBody([
-                    html.Div(selection_attributes()),
-                    ])
+                    dbc.CardHeader('System chosen Cost properties:'),
+                    dbc.CardBody(
+                    dbc.Row([
+                    dbc.Col(html.Div(selection_cost_attributes())),
+                    dbc.Col(html.Div(selection_total_cost(),style={'padding-left': 5}),md=2),
+                    ]),
+                    )
                 ]),
-            ],md=2
+                 id="fade-when-selection",
+        is_in=False,
+        # appear=False,
+        ),
+            ],md=4
+            ),
+            dbc.Col([
+                html.Div(dcc.Graph(id='fuzzy-data-display')),
+            ],style={"height": "100%"}
             ),
             # dbc.Col(dcc.Graph(id='datatable-interactivity-pie-container')),
             # dbc.Col(dropdown())
-        ],#style={'padding': 15}#,md=3
+        ]#style={"height": "100vh"},#style={'padding': 15}#,md=3
         ),
+
         dcc.Store(id="sync"),
         dcc.Store(id="uncovered-attack"),
         dcc.Store(id="covered-attack"),
@@ -419,6 +625,8 @@ app.layout = dbc.Container(
     ],
     fluid=True,
 )
+
+
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
