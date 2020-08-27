@@ -681,7 +681,7 @@ def updateur(attack_info,protect_info,asked_update):
 
 app.layout = dbc.Container(
     [
-        html.H1(children='Protection coverage simulation',style={'textAlign': 'center'}),
+        html.H1([dcc.Markdown("Protection coverage simulation [more about](https://github.com/kacouane/security-sys-dash)")],style={'textAlign': 'center'}),
         html.Hr(),
         dbc.Row([
             dbc.Col([
