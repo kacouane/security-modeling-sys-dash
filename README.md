@@ -8,7 +8,7 @@ This is part of a PHD work. It been made by [Antoine Linarès](mailto:antoine.li
 ## Screenshots
 ![initial](img/Screenshot_1.png)
 
-![initial](img/Screenshot_1.png)
+![initial](img/Screenshot_2.png)
 
 
 ## Built With
