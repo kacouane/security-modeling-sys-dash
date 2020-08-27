@@ -1,0 +1,21 @@
+Attack,Attack implementation cost,related article
+replay (with survey tools),1,http://doi.org/10.1109/CSFW.1994.315935
+bruteforce,1,https://doi.org/10.1109/PRISMS.2014.6970600
+longjump,3,https://grsecurity.net/effectiveness_of_intel_cet_against_code_reuse_attacks
+interrupt based,3,https://ieeexplore.ieee.org/document/8884464
+time granularity,3,https://www.sogis.eu/documents/cc/domains/sc/JIL-Application-of-Attack-Potential-to-Smartcards-v3-0.pdf
+COOP,3,http://doi.org/10.1109/SP.2015.51
+obfuscated,3,https://www.nds.ruhr-uni-bochum.de/media/nds/downloads/ws0910/AttackingWebServices.pdf
+LOOP,3,https://ieeexplore.ieee.org/document/7345282
+ret to gadget / payload,3,https://doi.org/10.1109/SP.2013.45
+control flow bending,2,https://www.usenix.org/system/files/conference/usenixsecurity15/sec15-paper-carlini.pdf
+ret/go to libc,3,http://link.springer.com/10.1007/978-3-642-23644-0_7
+functional OOP,3,https://ieeexplore.ieee.org/document/8433189/
+forward to gadget/payload,3,http://portal.acm.org/citation.cfm?doid=1866307.1866370
+indirect attack,3,https://doi.org/10.1109/IWIA.2004.1288041
+data space attack,3,http://ieeexplore.ieee.org/document/7546545/
+Data oriented Prog,3,http://ieeexplore.ieee.org/document/7546545/
+code injection,3,http://forum.ouah.org/FormatString.PDF
+microcode related,2,http://arxiv.org/abs/1801.01203
+rowhammer,2,http://doi.org/10.1007/978-3-319-40667-1_15
+fault attack,2,https://link.springer.com/content/pdf/10.1007%2F1-4020-8147-2_11.pdf

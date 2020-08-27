@@ -3,7 +3,7 @@
 
 
 #
-#   This Code been made in order to provide a tool that should help undestanding vulnerability coverage by Protection
+#   This Code been made in order to provide a tool that should help understanding vulnerability coverage by Protection
 #   It been made by Antoine Linarès:  antoine.linares@sifive.com
 #
 
@@ -26,10 +26,10 @@ import dash_daq as daq
 #
 # Loading database
 #
-DRIVE_PATH='/home/antoine/Documents/GDrive/'
-dataset = pa.read_csv(DRIVE_PATH+'CFI_survey/test excel/Survey_Compare_Tab-database.csv')
-attack_properties = pa.read_csv(DRIVE_PATH+'CFI_survey/test excel/Survey_Compare_Tab - export_attack_properties.csv')
-fuzzybests = pa.read_csv('fuzzy_bests.csv') 
+DATABASE_PATH='./.ressources/'
+protection_properties = pa.read_csv(DATABASE_PATH+'Survey_Compare_Tab - export_tech_properties.csv')
+attack_properties = pa.read_csv(DATABASE_PATH+'Survey_Compare_Tab - export_attack_properties.csv')
+fuzzybests = pa.read_csv(DATABASE_PATH+'fuzzy_bests.csv') 
 
 #formating database
 fuzzybests = fuzzybests.drop(columns=['Unnamed: 0'])
@@ -40,13 +40,13 @@ fuzzybests['size'] = 1 #TODO size depend on coverage ponderated ?
 #   use Technologie name as unique key to select a row for the tech property tab
 #
 Master_key_Column = 'Technology'
-dataset['id'] = dataset[Master_key_Column]
-dataset.set_index('id', inplace=True, drop=False)
+protection_properties['id'] = protection_properties[Master_key_Column]
+protection_properties.set_index('id', inplace=True, drop=False)
 
 #
 #   create a header with links linking to tech paper
 #
-dataset['Protections'] = '['+dataset['id']+']('+dataset['reference paper']+')'
+protection_properties['Protections'] = '['+protection_properties['id']+']('+protection_properties['reference paper']+')'
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -59,7 +59,7 @@ Cost_input_Columns = ['Cost memory','cost in process','Cost runtime']
 Total_Cost_Column = 'total cost'
 Attack_List = list(attack_properties['Attack'])
 nb_of_data_to_display =2000
-Protection_list = list(dataset[Master_key_Column])
+Protection_list = list(protection_properties[Master_key_Column])
 
 
 
@@ -77,7 +77,7 @@ app = Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
 
 
 def return_coverage(selection,database):
-    subdata = pa.DataFrame(database,columns=[ i for i in dataset.columns])
+    subdata = pa.DataFrame(database,columns=[ i for i in protection_properties.columns])
     selection_database = subdata.query(Master_key_Column+' in '+str(selection))
     list_of_coverage = list(selection_database[column].astype('int64').max() for column in Attack_List)
     if len(list_of_coverage) != 0 :
@@ -87,7 +87,7 @@ def return_coverage(selection,database):
     return ret
 
 def return_coverage_ponderated(selection,database,ponderation):
-    subdata = pa.DataFrame(database,columns=[ i for i in dataset.columns])
+    subdata = pa.DataFrame(database,columns=[ i for i in protection_properties.columns])
     selection_database = subdata.query(Master_key_Column+' in '+str(selection))
     list_of_coverage = list(selection_database[column].astype('int64').max() for column in Attack_List)
     if len(list_of_coverage) != 0 :
@@ -99,7 +99,7 @@ def return_coverage_ponderated(selection,database,ponderation):
 
 
 def return_cost(selection,database):
-    subdata = pa.DataFrame(database,columns=[ i for i in dataset.columns])
+    subdata = pa.DataFrame(database,columns=[ i for i in protection_properties.columns])
     selection_database = subdata.query(Master_key_Column+' in '+str(selection))
     a = selection_database[Total_Cost_Column].sum()
     if a == 0:
@@ -117,15 +117,15 @@ def generate_table():
     return html.Div([dash_table.DataTable(
         id='datatable-interactivity',
         columns=
-        [{"name": i, "id": i,'type':'text', "presentation":"markdown"} for i in dataset.columns 
+        [{"name": i, "id": i,'type':'text', "presentation":"markdown"} for i in protection_properties.columns 
         if i == Header_Column] +
         [
-            {"name": i, "id": i, "editable": True if ((i in Attack_List)or (i in Cost_input_Columns)) else False} for i in dataset.columns
+            {"name": i, "id": i, "editable": True if ((i in Attack_List)or (i in Cost_input_Columns)) else False} for i in protection_properties.columns
             # omit the column that should be hidden
             if (not(i in Hidden_Columns)) 
         ]
         ,
-        data=dataset.to_dict('records'),
+        data=protection_properties.to_dict('records'),
         editable=True,
         filter_action="native", #TODO check if we don't just add a reset sort button and remove this 
         sort_action="native",
@@ -161,7 +161,7 @@ def dropdown():
     return html.Div([
     dcc.Dropdown(
         id='dropdown-selector',
-        options= [{'label':i,'value':i} for i in dataset['id']],
+        options= [{'label':i,'value':i} for i in protection_properties['id']],
         multi=True,
         placeholder="Select one or more protection technology ...",
     ),
@@ -180,6 +180,22 @@ def alerter():
             is_open=False,
             duration=20000,
             color="danger",
+            dismissable=True,
+        ),
+    ])
+
+#
+# #     This alert is used to display when update is in progress for fuzz tab
+#
+
+def alertUpdate():
+    return html.Div([
+        dbc.Alert(
+           "Update in progress",
+            id="alert-progress",
+            is_open=False,
+            # duration=20000,
+            color="warning",
             dismissable=True,
         ),
     ])
@@ -252,7 +268,7 @@ def selection_cost_attributes():
 
 
 #
-# #     This display should contain selected protection attributes total
+# #     This digit display should contain selected protection attributes total
 #
 
 def selection_total_cost():
@@ -260,7 +276,6 @@ def selection_total_cost():
         daq.LEDDisplay(
             label="Total Cost",
             id="total-display",
-            # value=0,
         )
     ])
 
@@ -274,7 +289,7 @@ def generate_fuzzy_report(dataset):
         dataset,
         y="cost",
         z="coverage",
-        color="coverage_over_cost",
+        color="coverage over cost ponderated",
         x="nb_tech_used",
         height=1200,
         hover_data=["techs"],
@@ -387,7 +402,7 @@ def callback_dropdown(values):
     group='row_selector'
     )
 def callback_tab(values):
-    selection_subset = dataset.loc[values]
+    selection_subset = protection_properties.loc[values]
     return list(selection_subset[Master_key_Column])
 
 
@@ -402,17 +417,17 @@ def callback_tab(values):
 def updateur(sync_value,selection_table,selection_dropdown):
     if selection_table is None:
         dropdown_sync_value = None
-        table_synced_value_1 = [np.where(dataset.index == sync_value[i])[0][0] for i in range(len(sync_value))] if sync_value != dropdown_sync_value else dash.no_update
+        table_synced_value_1 = [np.where(protection_properties.index == sync_value[i])[0][0] for i in range(len(sync_value))] if sync_value != dropdown_sync_value else dash.no_update
     else:
-        selection_subset = dataset.loc[selection_table]
+        selection_subset = protection_properties.loc[selection_table]
         dropdown_sync_value = list(selection_subset[Master_key_Column])
-        table_synced_value_1 = [np.where(dataset.index == sync_value[i])[0][0] for i in range(len(sync_value))] if sync_value != dropdown_sync_value else dash.no_update
+        table_synced_value_1 = [np.where(protection_properties.index == sync_value[i])[0][0] for i in range(len(sync_value))] if sync_value != dropdown_sync_value else dash.no_update
     
     if selection_dropdown is None:
         table_synced_value = None
         dropdown_sync_value_1 = sync_value if sync_value != selection_dropdown else dash.no_update
     else:
-        table_synced_value =[np.where(dataset.index == selection_dropdown[i])[0][0] for i in range(len(selection_dropdown))]
+        table_synced_value =[np.where(protection_properties.index == selection_dropdown[i])[0][0] for i in range(len(selection_dropdown))]
         dropdown_sync_value_1 = sync_value if sync_value != selection_dropdown else dash.no_update
     
     return [dropdown_sync_value_1,table_synced_value_1]
@@ -439,8 +454,8 @@ def updateur(sync_value,selection_table,selection_dropdown):
 
 def generate_summary(
  selected_rows, # the tech selected by both checkboxes and dropdown system
- datatab, # is dataset but updated by user
- updated_datas_timestamp, #just to have access to the datas updated by user (easyness factor)
+ datatab, # is protection_properties but updated by user
+ updated_datas_timestamp, #just to have access to the data updated by user (easyness factor)
  updated_datas           ):
     
 
@@ -455,16 +470,16 @@ def generate_summary(
 
     #we need properties of the selected rows
     if selected_rows is None:
-        dff = dataset
+        dff = protection_properties
     else:
-        subdata = pa.DataFrame(datatab,columns=[ i for i in dataset.columns])
+        subdata = pa.DataFrame(datatab,columns=[ i for i in protection_properties.columns])
         subdata['id'] = subdata[Master_key_Column]
         subdata.set_index('id', inplace=True, drop=False)
         dff = subdata.loc[selected_rows]
     # at this point we should have all the datas needed to get coverage of selection 
 
     #
-    # # the following is needed to have a dynamic (potentialy extensible) tab
+    # # the following is needed to have a dynamic (potentially extensible) tab
     #
     accucoverage= pa.DataFrame({
         "Attacks":Attack_List,
@@ -480,26 +495,44 @@ def generate_summary(
         {"name": 'Selection accumulated Coverage', "id": 'Selection accumulated Coverage', "editable": False}
     ]
     
-    df= pa.DataFrame({
+    #
+    # #     following data are used for coverage pie display
+    #
+    Pie_coverage_data = {
         'coverage':['vulnerability remaining','covered attacks'],
-        'nb':[(accucoverage.loc[accucoverage['Selection accumulated Coverage']== 0]).count()[0],(accucoverage.loc[accucoverage['Selection accumulated Coverage']== 1]).count()[0]]#accucoverage['Attacks'].count()-sum(accucoverage['Selection accumulated Coverage']),sum(accucoverage['Selection accumulated Coverage'])]
-        })
+        'nb':[(accucoverage.loc[accucoverage['Selection accumulated Coverage']== 0]).count()[0],(accucoverage.loc[accucoverage['Selection accumulated Coverage']== 1]).count()[0]]
+        }
+    Pie_coverage_graph= px.pie(Pie_coverage_data,
+         values='nb',
+         names='coverage',
+         color='coverage',
+         color_discrete_map={'vulnerability remaining':'tomato','covered attacks':'lightgreen'}
+         )
 
-
-    df2= pa.DataFrame({
+    #
+    # #     following data are used for coverage ponderated pie display
+    #
+    Pie_coverage_ponderated_data= {
         'coverage':['vulnerability remaining ponderated','covered attacks ponderated'],
-        'nb':[(accucoverage['Attack easyness factor'].sum())-(accucoverage['factor_hidden'].sum()),accucoverage['factor_hidden'].sum()]#accucoverage['Attacks'].count()-sum(accucoverage['Selection accumulated Coverage']),sum(accucoverage['Selection accumulated Coverage'])]
-        })
+        'nb':[(accucoverage['Attack easyness factor'].sum())-(accucoverage['factor_hidden'].sum()),accucoverage['factor_hidden'].sum()]
+        }
+    Pie_coverage_ponderated_graph = px.pie(Pie_coverage_ponderated_data,
+        values='nb',
+        names='coverage',
+        color='coverage',
+        color_discrete_map={'vulnerability remaining ponderated':'#CC0000','covered attacks ponderated':'#007E33'}
+        )
 
     return [accucoverage.to_dict('records'),columns_accucoverage,       
-        px.pie(df, values='nb', names='coverage',color='coverage',color_discrete_map={'vulnerability remaining':'tomato','covered attacks':'lightgreen'}),
-        px.pie(df2, values='nb', names='coverage',color='coverage',color_discrete_map={'vulnerability remaining ponderated':'#CC0000','covered attacks ponderated':'#007E33'}),
-        list(accucoverage.loc[accucoverage['Selection accumulated Coverage']== 0]['Attacks']),
+        Pie_coverage_graph,
+        Pie_coverage_ponderated_graph,
+        list(accucoverage.loc[accucoverage['Selection accumulated Coverage']== 0]['Attacks']), # Theses two lists are useful to display uncovered attack in red in the main tab
         list(accucoverage.loc[accucoverage['Selection accumulated Coverage']== 1]['Attacks']),
         ]
 
+
 #
-# #     folowing callback should display properties of the system made by selected elements
+# #     following callback display the cost properties of the system made by user selected elements
 #
 @app.callback(
     [Output('select-attribute', 'data'),
@@ -510,91 +543,101 @@ def generate_summary(
     [Input('sync', 'data'),
     Input('datatable-interactivity', 'data')
     ])
-def propertify(selection,mega_tab):
+def updateCost(selection,mega_tab):
     if (selection is None) or (selection == []):
         data = []
         sum_cost = 0
         columns = []
         display = False
     else :
-        subdata = pa.DataFrame(mega_tab,columns=[ i for i in dataset.columns])
-        data = [{
-            "Protection Selected": i,
-            "Cost": subdata[subdata[Master_key_Column]== i][Total_Cost_Column]
-        } for i in selection]
+        solution_cost = []
+        for row in mega_tab:
+            if row[Master_key_Column] in selection :
+                solution_cost.append(row[Total_Cost_Column])
+        data = pa.DataFrame({
+            'Protection Selected': list(selection),
+            'Cost': list(solution_cost),
+        })
+        data = data.to_dict('records')
         columns = [{"name": i, "id": i} for i in ['Protection Selected','Cost']]
         display = True
-        sum_cost = subdata.query(Master_key_Column+' in '+str(selection))[Total_Cost_Column].sum()
+        sum_cost = sum(solution_cost)
+        if sum_cost == 0:
+            sum_cost = 1
     return [data,columns,sum_cost,display]
 
 
 #
-# #     folowing callback should display the best solutions generated during fuzzy 
+# #     folowing callback should display the solutions generated during fuzzing
 #
-
 @app.callback(
     [Output('fuzzy-data-display', 'figure'),
     ],
     [Input('sync', 'data'),
     Input('datatable-interactivity', 'data'),
     Input('updated-fuzzy', 'data'),
+    Input('select-attribute-coverage', 'data'),
     ]
     )
-def fuzzy_graph(selection,data_uptodate,fuzzy_uptodate):
-    # to_report =fuzzy_bests.query('coverage_over_cost'+' in '+ str(list(old['coverage_over_cost'].nlargest(nb_of_data_to_display))))
+def fuzzy_graph(selection,data_uptodate,fuzzy_uptodate,attack_properties):
     if fuzzy_uptodate is None :
         to_report = fuzzybests
+        to_report['coverage over cost ponderated'] = to_report['coverage_over_cost']
     else:
         to_report = pa.read_json(fuzzy_uptodate,orient='split')
-    # print(fuzzy_uptodate)
     if not((selection is None) or (selection == [])):
+        attack_properties = pa.DataFrame(attack_properties)
+        attack_factor = list(attack_properties['Attack easyness factor'])
         selection = {
             'techs':str(selection),
             'coverage':return_coverage(selection,data_uptodate),
             'cost':return_cost(selection,data_uptodate),
             'source':'selection',
             'nb_tech_used':len(selection),
-            'size':4
+            'size':4,
+            'coverage ponderated':return_coverage_ponderated(selection,data_uptodate,attack_factor),
         }
         if selection['cost'] == 0:
             selection['cost']=1
-        selection['coverage_over_cost']=selection['coverage']/selection['cost']
+        
+        selection['coverage over cost ponderated']=selection['coverage ponderated']/selection['cost']
         to_report = to_report.append(selection,ignore_index = True)
-    # print(to_report)
     return generate_fuzzy_report(to_report)
 
-#
-# #     folowing callback should manage update button
-#
 
+#
+# #     folowing callback should manage update button and alert of update in progress
+#
 @app.callback(
     [Output('update-button', 'children'),
     Output('update-button', 'disabled'),
+    Output('alert-progress', 'is_open'),
     ],
     [Input('update-button', 'n_clicks'),
-    ],#State('generation-status', 'is_open'),
+    ],
     group='buttongroup'
     )
 def button_handler(click):
     context = dash.callback_context
     if (context.triggered[0]['prop_id']) == 'update-button.n_clicks':
-        return [[dbc.Spinner(size="sm"), " Loading..."],True]
-    return [["Update fuzzy graph with modified values (may take time)"],False]
+        return [[dbc.Spinner(size="sm"), " Loading..."],True,True]
+    return [["Update fuzzy graph with modified values (may take time)"],False,False]
 
 @app.callback([Output('update-button', 'children'),
     Output('update-button', 'disabled'),
+    Output('alert-progress', 'is_open'),
     ],
     [Input('generation-status', 'is_open'),
     ],group='buttongroup'
     )
 def finish_update_handler(finish):
-    return [["Update fuzzy graph with modified values (may take time)"],False]
+    return [["Update fuzzy graph with modified values (may take time)"],False,False]
+
+
 
 #
 # #     folowing callback should update fuzzy best solutions with changed characteristics
 #
-
-
 @app.callback(
     [Output('updated-fuzzy', 'data'),
     Output('generation-status', 'is_open')
@@ -603,27 +646,29 @@ def finish_update_handler(finish):
     Input('datatable-interactivity', 'data'),
     Input('update-button', 'disabled'),
     ],
-    # [State('update-button', 'disabled')],
-
     )
 def updateur(attack_info,protect_info,asked_update):
+    # Prevent any update when values are changed and no update button pressed
     context = dash.callback_context
-    # # print((context.triggered[0]),'updateur')
     if not(asked_update):
         raise dash.exceptions.PreventUpdate
-    print('start update')
+    
     updated_fuzzy = fuzzybests
     attack_info = pa.DataFrame(attack_info)
     attack_factor = list(attack_info['Attack easyness factor'])
+
     def updateur_cost_helper(x):
         return return_cost((list(j[1:-1] for j in (x[1:-1]).split(', '))),protect_info)
-    def updateur_coverage_helper(x):
+    def updateur_coverage_ponderated_helper(x):
         return return_coverage_ponderated((list(j[1:-1] for j in (x[1:-1]).split(', '))),protect_info,attack_factor)
+    def updateur_coverage_helper(x):
+        return return_coverage((list(j[1:-1] for j in (x[1:-1]).split(', '))),protect_info)
+
     updated_fuzzy['cost'] = updated_fuzzy['techs'].apply(updateur_cost_helper)
     updated_fuzzy['coverage'] = updated_fuzzy['techs'].apply(updateur_coverage_helper)
-    updated_fuzzy['coverage_over_cost']=updated_fuzzy['coverage']/updated_fuzzy['cost']
-    # print(updated_fuzzy)
-    print('end update')
+    updated_fuzzy['coverage ponderated'] = updated_fuzzy['techs'].apply(updateur_coverage_ponderated_helper)
+    updated_fuzzy['coverage over cost ponderated']=updated_fuzzy['coverage ponderated']/updated_fuzzy['cost']
+
     return [updated_fuzzy.to_json(orient='split'),True]
 
 
@@ -653,7 +698,6 @@ app.layout = dbc.Container(
                     ,style={'padding': 15}
                 ),  
                 ]
-                # body=True,
                 ),
             ],md=8
             ),
@@ -661,16 +705,12 @@ app.layout = dbc.Container(
             dbc.Card([ 
                 dbc.CardHeader('Selection protection summary:',style={'fontWeight': 'bold'}),
                 dbc.Col([
-                    # dbc.Card([ 
                     html.Div(selection_coverage_attributes(),style={'padding': 15}),
 
                     dbc.Row([
                         dbc.Col(dcc.Graph(id='datatable-interactivity-pie-coverage'),md=6),
                         dbc.Col(dcc.Graph(id='datatable-interactivity-pie-coverage-ponderated'),md=6),
                     ])
-                    #  ],
-                    #  body=True,
-                    #  ),
                 ]),
             ]),
             ],md=4),
@@ -690,22 +730,21 @@ app.layout = dbc.Container(
                 ]),
                 id="fade-when-selection",
                 is_in=False,
-                # appear=False,
                 ),
             ],md=4
             ),
             dbc.Col([
                 dbc.Card([
-                dbc.CardHeader('Graph made of the 2000 best configuration output from a fuzzing campain:'),
+                dbc.CardHeader('Graph made from the 2000 best configuration output of a fuzzing campain:'),
                 dbc.CardBody([
+                    alertUpdate(),
                     html.Div(dcc.Graph(id='fuzzy-data-display'),style={"padding": 10}),
                 ]
                 )])
             ],style={"padding": 5}
             ),
-            # dbc.Col(dcc.Graph(id='datatable-interactivity-pie-container')),
-            # dbc.Col(dropdown())
-        ]#style={"height": "100vh"},#style={'padding': 15}#,md=3
+
+        ]
         ),
 
         dcc.Store(id="sync"),
@@ -713,16 +752,15 @@ app.layout = dbc.Container(
         dcc.Store(id="covered-attack"),
         dcc.Store(id='updated-fuzzy'),
         dbc.Toast(
+            ["Thank you for your time ;-p"],
             id="generation-status",
             header="Update of fuzzy database done",
             is_open=False,
             dismissable=False,
             duration=5000,
             icon="success",
-            # top: 66 positions the toast below the navbar
             style={"position": "fixed", "bottom": 66, "left": 10, "width": 350},
         ),
-        # dcc.Store(id='generation-status'),
         #TODO generate report
         #generate best solution
     ],
@@ -738,4 +776,4 @@ app.layout = dbc.Container(
 
 
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    app.run_server(debug=False)
