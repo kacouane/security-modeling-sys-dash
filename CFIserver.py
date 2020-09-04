@@ -377,7 +377,7 @@ def update_columns(data_timestamp,data_input):
         row[Total_Cost_Column] = sum(int(row[i]) for i in Cost_input_Columns) 
     for row in data_input:
         for attack in Attack_List:
-            if not(int(row[attack]) in [0,1]):
+            if not(str(row[attack]) in ['0','1']):
                 row[attack] = 'NA'
                 return [data_input,True]
     
