@@ -1,8 +1,8 @@
-# dash-CFI-system-Protection
+# security-modeling-sys-dash
 
 
 ## Introduction
-`Dash-CFI-system-protection` is a dashboard for monitoring real-time a security system properties along to thousands of others. 
+`security-modeling-sys-dash` is a dashboard for monitoring real-time a security system properties along to thousands of others. 
 This is part of a PHD work. It been made by [Antoine Linarès](mailto:antoine.linares@sifive.com)
 
 ## Screenshots
